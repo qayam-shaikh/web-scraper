@@ -63,7 +63,6 @@ def parse_json_ld(soup: BeautifulSoup) -> Tuple[str, str, str, str]:
         elif isinstance(data, list):
             candidates = [x for x in data if isinstance(x, dict)]
 
-
         for obj in candidates:
 
             t = str(obj.get("@type", "")).lower()
@@ -98,3 +97,59 @@ def parse_json_ld(soup: BeautifulSoup) -> Tuple[str, str, str, str]:
         
     return "", "", "", ""
 
+def parse_next_data(soup: BeautifulSoup) -> Tuple[str,str,str,str]:
+    """
+    Fallback: parse __NEXT_DATA__ if json ld fails
+    """
+    node = soup.find('script',id='__NEXT_DATA__')
+    if not node:
+        return "","","",""
+    raw = node.string or node.get_text(strip=True)
+    if not raw:
+        return "","","",""
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return "","","",""
+    
+    def walk(obj: Any):
+        if isinstance(obj,dict):
+            yield obj
+            for v in obj.values():
+                yield from walk(v)
+        elif isinstance(obj,list):
+            for item in obj:
+                yield from walk(item)
+        
+    title = byline = published = content = ""
+    for d in walk(data):
+        if not title and isinstance(d.get('headline'),str):
+            title = d["headline"]
+        if not byline and isinstance(d.get('byline'),str):
+            byline = d['byline']
+        if not byline and isinstance(d.get('bylines'),str):
+            parts = []
+            for b in d['bylines']:
+                if isinstance(b,dict) and isinstance(b.get('byline'),str):
+                    parts.append(b['byline'])
+            if parts:
+                byline = " /".join(parts)
+        
+        if not published and isinstance(d.get('firstPublished'),str):
+            published = d['firstPublished']
+        if not published and isinstance(d.get('pubDate'),str):
+            published = d['pubDate']
+        if not content and isinstance(d.get('articleBody'),str):
+            content = d['articleBody']
+        if not content and isinstance(d.get('body'), str) and len(d['body'])>200:
+            content = d['body']
+
+        if title and published and content:
+            break
+    
+    return (
+        title.strip(),
+        byline.strip(),
+        _format_iso_date(published.strip()) if published else "",
+        _clean_whitespace(content.strip()) if content else "",
+    )
