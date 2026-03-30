@@ -153,3 +153,22 @@ def parse_next_data(soup: BeautifulSoup) -> Tuple[str,str,str,str]:
         _format_iso_date(published.strip()) if published else "",
         _clean_whitespace(content.strip()) if content else "",
     )
+
+def parse_updated_date(soup: BeautifulSoup)->str:
+    """
+    NYT often includes updated time in meta tags or time elements.
+    We'll try a few common options.
+    """
+
+    for key in ["article:modified_time", "nyt:ptime", "parsely-pub-date"]:
+        tag = soup.find('meta', attrs={'property':key}) or soup.find('meta', attrs={'name':key})
+        if tag and tag.get('content'):
+            return _format_iso_date(tag['content'].strip())
+    
+    # fallback 1
+    time_tag = soup.find('time', attrs={"datetime":True})
+    if time_tag and time_tag.get('datetime'):
+        return _format_iso_date(time_tag['datetime'].strip())
+    
+    # fallback 2
+    return ""
