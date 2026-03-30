@@ -172,3 +172,42 @@ def parse_updated_date(soup: BeautifulSoup)->str:
     
     # fallback 2
     return ""
+
+def parse_html_article_body(soup: BeautifulSoup)->str:
+    """
+    Last resort: find paragraphs in the visible article body.
+    NYT commonly uses section[name="articleBody"].    
+    """
+    body_section = soup.find('section', attrs={'name':'articleBody'})
+    if not body_section:
+        body_section = soup.find('article') or soup
+
+    junk_phrases = [
+    "We are having trouble retrieving the article content",
+    "Please enable JavaScript in your browser settings",
+    "Thank you for your patience while we verify access",
+    "Already a subscriber? Log in",
+    "Want all of The Times? Subscribe",
+    ]
+
+    paragraphs = []
+    for p in body_section.find_all("p"):
+        text = p.get_text(" ", strip=True)
+
+        if not text:
+            continue
+
+        if any(phrase in text for phrase in junk_phrases):
+            continue
+        paragraphs.append(text)
+
+    cleaned = []
+    seen = set()
+    for para in paragraphs:
+        key = para.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(para)
+
+    return _clean_whitespace("\n\n".join(cleaned))
