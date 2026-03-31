@@ -9,7 +9,7 @@ import json
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0"
 
 @dataclass
-class article:
+class Article:
     url : str
     title : str
     byline : str
@@ -211,3 +211,42 @@ def parse_html_article_body(soup: BeautifulSoup)->str:
         cleaned.append(para)
 
     return _clean_whitespace("\n\n".join(cleaned))
+
+def scrape_nyt(url: str)->Article:
+    html = fetch_html(url)
+    soup = BeautifulSoup(html,'html.parser')
+
+    updated = parse_updated_date(soup)
+
+    title, byline, published, content = parse_json_ld(soup)
+
+    if not (title and content):
+        t2, b2, p2, c2 = parse_next_data(soup)
+        title = title or t2
+        byline = byline or b2
+        published = published or p2
+        content = content or c2
+
+    if not content:
+        content = parse_html_article_body(soup)
+    
+    if not title:
+        og = soup.find('meta', attrs={'property': 'og:title'})
+        if og and og.get('content'):
+            title = og['content'].strip()
+        else:
+            title = (soup.title.get_text(strip=True) if soup.title else "").strip()
+
+    if not byline:
+        byl = soup.find('meta', attrs={'name':'byl'})
+        if byl and byl.get('content'):
+            byline = byl['content'].strip()
+
+    return Article(
+        url=url,
+        title=title or "(title not found)",
+        byline=byline,
+        published=published,
+        updated=updated,
+        content=content or "(content not found - possible paywall or page change structure)",
+    )
