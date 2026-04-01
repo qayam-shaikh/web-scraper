@@ -5,10 +5,12 @@ import argparse
 import re
 from dataclasses import dataclass
 import requests
-from bs4 import BeautifulSoup
-from typing import Optional, Any, List, Tuple
 from datetime import datetime
 import json
+
+from bs4 import BeautifulSoup
+from typing import Optional, Any, List, Tuple
+from playwright.sync_api import sync_playwright
 
 # USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0"
 USER_AGENT = (
@@ -41,17 +43,18 @@ def _format_iso_date(value: Optional[str]) -> str:
     except Exception:
         return value
 
-def fetch_html(url: str, timeout: int = 20) -> str:
-    headers = {
-        "User-Agent": USER_AGENT,
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Cache-Control": "no-cache",
-        "Pragma": "no-cache",
-    }
-    resp = requests.get(url, headers=headers, timeout=timeout)
-    resp.raise_for_status()
-    return resp.text
+def fetch_html(url: str)-> str:
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        page = browser.new_page()
+
+        page.goto(url, timeout=30000)
+        page.wait_for_load_state('networkidle')
+
+        html = page.content()
+
+        browser.close()
+        return html
 
 def parse_json_ld(soup: BeautifulSoup) -> Tuple[str, str, str, str]:
 
