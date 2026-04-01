@@ -43,18 +43,34 @@ def _format_iso_date(value: Optional[str]) -> str:
     except Exception:
         return value
 
-def fetch_html(url: str)-> str:
+def fetch_html_playwright(url:str)->str:
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
 
-        page.goto(url, timeout=30000)
-        page.wait_for_load_state('networkidle')
+            page.goto(url, timeout=30000)
+            page.wait_for_load_state('networkidle')
 
-        html = page.content()
+            html = page.content()
 
-        browser.close()
-        return html
+            browser.close()
+            return html
+
+def fetch_html(url: str, timeout:int=20)-> str:
+    try:
+        headers = {
+        "User-Agent": USER_AGENT,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        }
+        resp = requests.get(url, headers=headers, timeout=timeout)
+        resp.raise_for_status()
+        return resp.text
+    except requests.RequestException:
+        print(f"Fallback to browser for url: {url}")
+        return fetch_html_playwright(url)
 
 def parse_json_ld(soup: BeautifulSoup) -> Tuple[str, str, str, str]:
 
